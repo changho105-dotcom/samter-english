@@ -455,6 +455,7 @@ body { font-family: 'Nunito', sans-serif; }
 .speak-pulse { animation: pulse-speak 1.2s infinite; background:#FFF0F0 !important; color:#FF6B6B !important; }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script src="https://code.responsivevoice.org/responsivevoice.js?key=FREE"></script>
 </head>
@@ -1581,8 +1582,15 @@ function fbInit() {
     const cfg = JSON.parse(raw);
     if (!cfg.apiKey || !cfg.databaseURL) return;
     const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(cfg);
-    fbDb = firebase.database(app);
-    fbSyncEpisodes(); // 에피소드 실시간 동기화 시작
+    // RTDB 규칙이 열려 있어서(테스트 모드) 인증 없이 데이터베이스 전체를 누구나 읽고 쓸 수 있던
+    // 문제 수정(2026-08-03) — 로그인 화면이 없는 앱이라 Firebase 익명 인증으로 자동 인증 처리.
+    // 인증이 끝나야 fbDb를 세팅해서, 그 전까진 다른 fb* 함수들이 "if (!fbDb) return;" 가드로
+    // 조용히 대기함(화면상 변화 없음). Firebase 콘솔에서 RTDB 규칙을
+    // {"rules": {".read": "auth != null", ".write": "auth != null"}}로 바꿔야 실제로 막힘
+    firebase.auth().signInAnonymously().then(function(){
+      fbDb = firebase.database(app);
+      fbSyncEpisodes(); // 에피소드 실시간 동기화 시작
+    }).catch(function(err){ console.warn('Firebase 익명 인증 실패:', err); });
   } catch(e) { console.warn('Firebase init skipped:', e); }
 }
 
