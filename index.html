@@ -1181,8 +1181,17 @@ function buildChars() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function getChar(n) { return ALL_CHARS.find(c => c.n === n) || {em:'⭐', bg:'#FFE0E0'}; }
 
-function buildListen(noPush) {
-  if (!curEp) { showScreen('ep'); return; }
+function buildListen(noPush, _retries) {
+  // 2026-08-03: 익명 인증 추가 후 생긴 타이밍 문제 수정 — 예전엔 fbSyncEpisodes()가 곧바로
+  // 시작됐는데, 이제 그 앞에 signInAnonymously() 왕복이 하나 더 생겨서 캐시가 없는(처음 쓰는)
+  // 기기에서는 학생이 반/이름을 빠르게 선택하고 들어올 때 curEp가 아직 안 채워져 있을 수 있음.
+  // 예전엔 즉시 에피소드 화면으로 튕겨버려서 "로그인 화면까지는 나오는데 안 넘어간다"는 문제로
+  // 보고됨 — 최대 4초(300ms x 13회) 기다렸다가 그래도 없으면 그때 포기하도록 수정
+  if (!curEp) {
+    const retries = _retries || 0;
+    if (retries < 13) { setTimeout(() => buildListen(noPush, retries + 1), 300); return; }
+    showScreen('ep'); return;
+  }
   stopTTS(); playingAll = false; heardSet = new Set();
   document.getElementById('listen-back').onclick = () => {
     stopTTS(); playingAll = false;
