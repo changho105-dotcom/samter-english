@@ -457,6 +457,26 @@ body { font-family: 'Nunito', sans-serif; }
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script>
+// 2026-08-03: 익명 인증을 본문 스크립트(1500줄+) 파싱이 끝난 맨 아래(fbInit)에서 시작하면,
+// 사용자가 반/이름을 다 고르고 버튼을 누른 "그 순간"에야 인증 왕복이 시작돼서 몇 초씩 기다리게
+// 됨(Kevin 지적: "그렇게 오래 걸리면 곤란"). 대신 Firebase SDK 로드 직후, 페이지 나머지가
+// 파싱되는 동안 미리 백그라운드로 인증을 시작해둠 — 사용자가 화면 몇 개 넘기는 그 몇 초 사이에
+// 인증이 이미 끝나 있어서, 실제로 버튼 눌렀을 때는 거의 안 기다리게 됨. window.__authReady를
+// fbInit()에서 재사용(같은 signInAnonymously를 두 번 호출하지 않음)
+try {
+  const cfg = {
+    apiKey: "AIzaSyA6AdMsfk4x23srluHfOeXPBt8SjcbpkJU",
+    authDomain: "samter-episode.firebaseapp.com",
+    databaseURL: "https://samter-episode-default-rtdb.firebaseio.com",
+    projectId: "samter-episode"
+  };
+  if (!localStorage.getItem('fb_config')) localStorage.setItem('fb_config', JSON.stringify(cfg));
+  const savedCfg = JSON.parse(localStorage.getItem('fb_config'));
+  window.__fbApp = firebase.initializeApp(savedCfg);
+  window.__authReady = firebase.auth().signInAnonymously();
+} catch (e) { console.warn('Firebase 조기 초기화 실패:', e); }
+</script>
 <script src="https://code.responsivevoice.org/responsivevoice.js?key=FREE"></script>
 </head>
 <body>
@@ -1608,13 +1628,16 @@ function fbInit() {
   try {
     const cfg = JSON.parse(raw);
     if (!cfg.apiKey || !cfg.databaseURL) return;
-    const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(cfg);
+    const app = window.__fbApp || (firebase.apps.length ? firebase.app() : firebase.initializeApp(cfg));
     // RTDB 규칙이 열려 있어서(테스트 모드) 인증 없이 데이터베이스 전체를 누구나 읽고 쓸 수 있던
     // 문제 수정(2026-08-03) — 로그인 화면이 없는 앱이라 Firebase 익명 인증으로 자동 인증 처리.
-    // 인증이 끝나야 fbDb를 세팅해서, 그 전까진 다른 fb* 함수들이 "if (!fbDb) return;" 가드로
-    // 조용히 대기함(화면상 변화 없음). Firebase 콘솔에서 RTDB 규칙을
-    // {"rules": {".read": "auth != null", ".write": "auth != null"}}로 바꿔야 실제로 막힘
-    firebase.auth().signInAnonymously().then(function(){
+    // Firebase 콘솔에서 RTDB 규칙을 {"rules": {".read": "auth != null", ".write": "auth != null"}}로
+    // 바꿔야 실제로 막힘. 인증 자체는 <head>의 조기 초기화 스크립트가 페이지 로드 즉시 미리
+    // 시작해둠(window.__authReady) — 여기선 그 진행 중이거나 이미 끝난 인증을 재사용만 함
+    // (같은 signInAnonymously를 중복 호출하지 않음). 이렇게 하면 사용자가 반/이름을 고르는 동안
+    // 인증이 백그라운드에서 이미 끝나 있어서 체감 대기시간이 거의 없어짐(Kevin 지적 반영)
+    const authPromise = window.__authReady || firebase.auth().signInAnonymously();
+    authPromise.then(function(){
       fbDb = firebase.database(app);
       fbSyncEpisodes(); // 에피소드 실시간 동기화 시작
     }).catch(function(err){ console.warn('Firebase 익명 인증 실패:', err); });
