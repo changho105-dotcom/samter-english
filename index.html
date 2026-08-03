@@ -6,6 +6,29 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>⭐ Star & Star · Clever — English Practice</title>
+<script>
+// 2026-08-03: "케빈님만 되고 아이들은 다 안 된다"의 실제 원인 — 아이들은 카카오톡으로 받은
+// 링크를 카카오톡 인앱 브라우저로 바로 열고 있었음. 카카오톡 인앱 브라우저는 구글 로그인/인증
+// 요청을 자주 막아서 익명 인증이 실패함. 최대한 빨리(다른 스크립트보다 먼저) 감지해서 기본
+// 브라우저(삼성인터넷/크롬/사파리)로 자동으로 튕겨나가게 함 — 카카오가 공식 제공하는
+// kakaotalk://web/openExternal 스킴 사용, 아이들이 따로 뭘 누를 필요 없음
+(function () {
+  var ua = navigator.userAgent || '';
+  if (/kakaotalk/i.test(ua)) {
+    location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(location.href);
+    // 위 스킴이 안 먹히는 구버전 카카오톡 대비 — 1초 뒤에도 여전히 카톡 안이면(자동 전환 실패)
+    // 화면 전체를 가리는 안내문을 띄워서 수동으로라도 열게 함
+    setTimeout(function () {
+      var d = document.createElement('div');
+      d.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;font-family:sans-serif;';
+      d.innerHTML = '<div style="font-size:40px;margin-bottom:16px;">🌐</div>' +
+        '<div style="font-size:17px;font-weight:700;margin-bottom:10px;">브라우저로 열어주세요</div>' +
+        '<div style="font-size:14px;color:#555;line-height:1.6;">오른쪽 위 <b>··· (메뉴)</b> 를 누르고<br><b>"다른 브라우저로 열기"</b>를 선택해주세요</div>';
+      document.body.appendChild(d);
+    }, 1000);
+  }
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Fredoka+One&display=swap" rel="stylesheet">
 <style>
